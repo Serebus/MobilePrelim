@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import App from '../App';
 import { LoginScreen } from '../src/screens/LoginScreen';
 import { ShoppingScreen } from '../src/screens/ShoppingScreen';
+import { fakeStoreApi } from '../src/api/fakeStoreApi';
 import { TextInput, TouchableOpacity } from 'react-native';
 
 const safeAreaMetrics = {
@@ -22,7 +23,7 @@ describe('Shopping App & Authentication', () => {
 
   test('renders Login screen by default with all essential elements', async () => {
     let renderer: ReactTestRenderer.ReactTestRenderer;
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       renderer = ReactTestRenderer.create(<App />);
     });
 
@@ -40,7 +41,7 @@ describe('Shopping App & Authentication', () => {
     const onLoginSuccess = jest.fn();
     let renderer: ReactTestRenderer.ReactTestRenderer;
 
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       renderer = ReactTestRenderer.create(
         <SafeAreaProvider initialMetrics={safeAreaMetrics}>
           <LoginScreen onLoginSuccess={onLoginSuccess} />
@@ -62,7 +63,7 @@ describe('Shopping App & Authentication', () => {
     );
 
     if (signUpTab) {
-      await ReactTestRenderer.act(() => {
+      await ReactTestRenderer.act(async () => {
         signUpTab.props.onPress();
       });
 
@@ -75,7 +76,7 @@ describe('Shopping App & Authentication', () => {
     const onLoginSuccess = jest.fn();
     let renderer: ReactTestRenderer.ReactTestRenderer;
 
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       renderer = ReactTestRenderer.create(
         <SafeAreaProvider initialMetrics={safeAreaMetrics}>
           <LoginScreen onLoginSuccess={onLoginSuccess} />
@@ -91,7 +92,7 @@ describe('Shopping App & Authentication', () => {
     );
 
     expect(guestBtn).toBeDefined();
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       guestBtn!.props.onPress();
     });
 
@@ -106,7 +107,7 @@ describe('Shopping App & Authentication', () => {
     const onLoginSuccess = jest.fn();
     let renderer: ReactTestRenderer.ReactTestRenderer;
 
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       renderer = ReactTestRenderer.create(
         <SafeAreaProvider initialMetrics={safeAreaMetrics}>
           <LoginScreen onLoginSuccess={onLoginSuccess} />
@@ -122,11 +123,11 @@ describe('Shopping App & Authentication', () => {
     );
 
     expect(demoBtn).toBeDefined();
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       demoBtn!.props.onPress();
     });
 
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       jest.advanceTimersByTime(600);
     });
 
@@ -137,7 +138,7 @@ describe('Shopping App & Authentication', () => {
     );
   });
 
-  test('renders Shopping screen with products and allows adding to cart', async () => {
+  test('renders Shopping screen with FakeStoreAPI products, allows add to cart and checkout', async () => {
     const mockUser = {
       id: 'usr_test_1',
       name: 'Alex Johnson',
@@ -146,8 +147,29 @@ describe('Shopping App & Authentication', () => {
     };
     const mockLogout = jest.fn();
 
+    const sampleProducts = [
+      {
+        id: '1',
+        name: 'Fjallraven - Foldsack No. 1 Backpack',
+        price: 109.95,
+        category: "men's clothing",
+        rating: 3.9,
+        reviewsCount: 120,
+        description: 'Your perfect pack for everyday use',
+        icon: '👔',
+        inStock: true,
+      },
+    ];
+
+    const getCategoriesSpy = jest
+      .spyOn(fakeStoreApi, 'getCategories')
+      .mockResolvedValue(['all', "men's clothing", 'electronics']);
+    const getProductsSpy = jest
+      .spyOn(fakeStoreApi, 'getProducts')
+      .mockResolvedValue(sampleProducts);
+
     let renderer: ReactTestRenderer.ReactTestRenderer;
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       renderer = ReactTestRenderer.create(
         <SafeAreaProvider initialMetrics={safeAreaMetrics}>
           <ShoppingScreen user={mockUser} onLogout={mockLogout} />
@@ -166,8 +188,52 @@ describe('Shopping App & Authentication', () => {
     );
 
     expect(addBtn).toBeDefined();
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       addBtn!.props.onPress();
     });
+
+    // Check that checkout button appears
+    const checkoutBtn = root.findAllByType(TouchableOpacity).find((t) =>
+      typeof t.props.children?.props?.children === 'string' &&
+      t.props.children.props.children.includes('Checkout')
+    );
+    expect(checkoutBtn).toBeDefined();
+
+    // Trigger Checkout
+    await ReactTestRenderer.act(async () => {
+      checkoutBtn!.props.onPress();
+    });
+
+    getCategoriesSpy.mockRestore();
+    getProductsSpy.mockRestore();
+  });
+
+  test('fakeStoreApi supports getProducts, category filter, getCategories, and checkout', async () => {
+    const allProducts = await fakeStoreApi.getProducts();
+    expect(allProducts.length).toBeGreaterThan(0);
+
+    const electronics = await fakeStoreApi.getProducts({ category: 'electronics' });
+    expect(electronics.length).toBeGreaterThan(0);
+    expect(electronics.every((p) => p.category.toLowerCase() === 'electronics')).toBe(true);
+
+    const searchResults = await fakeStoreApi.getProducts({ search: 'Backpack' });
+    expect(searchResults.length).toBeGreaterThanOrEqual(1);
+    expect(searchResults[0].name).toContain('Backpack');
+
+    const categories = await fakeStoreApi.getCategories();
+    expect(categories).toContain('all');
+    expect(categories).toContain('electronics');
+
+    const singleProduct = await fakeStoreApi.getProductById(1);
+    expect(singleProduct).not.toBeNull();
+    expect(singleProduct?.name).toBeDefined();
+
+    const checkoutRes = await fakeStoreApi.checkout(
+      [{ product: singleProduct!, quantity: 2 }],
+      { id: 'u1', name: 'User Test', email: 'test@user.com' },
+    );
+    expect(checkoutRes.status).toBe('confirmed');
+    expect(checkoutRes.totalAmount).toBe(singleProduct!.price * 2);
+    expect(checkoutRes.orderId).toContain('FS-ORD-');
   });
 });

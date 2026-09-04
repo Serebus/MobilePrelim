@@ -1,7 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
+  Image,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -10,96 +13,78 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CartItem, Product, User } from '../types';
+import { fakeStoreApi } from '../api/fakeStoreApi';
 
 interface ShoppingScreenProps {
   user: User;
   onLogout: () => void;
 }
 
-const SAMPLE_PRODUCTS: Product[] = [
-  {
-    id: 'prod_1',
-    name: 'Wireless Noise-Canceling Headphones',
-    price: 89.99,
-    category: 'Electronics',
-    rating: 4.8,
-    reviewsCount: 245,
-    icon: '🎧',
-    description: 'Immersive sound with active noise cancellation and 30hr battery.',
-  },
-  {
-    id: 'prod_2',
-    name: 'Smart Fitness Tracker Watch',
-    price: 49.99,
-    category: 'Electronics',
-    rating: 4.6,
-    reviewsCount: 189,
-    icon: '⌚',
-    description: 'Heart rate monitor, step counter, sleep tracking, and waterproof.',
-  },
-  {
-    id: 'prod_3',
-    name: 'Classic Casual Denim Jacket',
-    price: 59.99,
-    category: 'Fashion',
-    rating: 4.7,
-    reviewsCount: 96,
-    icon: '🧥',
-    description: 'Durable, comfortable vintage wash denim for all seasons.',
-  },
-  {
-    id: 'prod_4',
-    name: 'Running Breathable Sneakers',
-    price: 74.99,
-    category: 'Fashion',
-    rating: 4.9,
-    reviewsCount: 312,
-    icon: '👟',
-    description: 'Lightweight cushioning engineered for high performance and road running.',
-  },
-  {
-    id: 'prod_5',
-    name: 'Stainless Steel Insulated Tumbler',
-    price: 24.99,
-    category: 'Home',
-    rating: 4.5,
-    reviewsCount: 88,
-    icon: '☕',
-    description: 'Keeps drinks hot for 12 hours and ice cold for 24 hours.',
-  },
-  {
-    id: 'prod_6',
-    name: 'Adjustable Yoga & Fitness Mat',
-    price: 29.99,
-    category: 'Fitness',
-    rating: 4.8,
-    reviewsCount: 154,
-    icon: '🧘',
-    description: 'Non-slip eco-friendly textured surface with carrying strap included.',
-  },
-];
-
-const CATEGORIES = ['All', 'Electronics', 'Fashion', 'Home', 'Fitness'];
+const formatCategoryName = (category: string): string => {
+  if (!category || category.toLowerCase() === 'all') return 'All';
+  return category
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
 
 export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
   user,
   onLogout,
 }) => {
   const insets = useSafeAreaInsets();
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>(['all']);
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [isCheckingOut, setIsCheckingOut] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCatalog = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      const [loadedCategories, loadedProducts] = await Promise.all([
+        fakeStoreApi.getCategories(),
+        fakeStoreApi.getProducts(),
+      ]);
+
+      setCategories(loadedCategories);
+      setProducts(loadedProducts);
+    } catch {
+      setError('Failed to fetch FakeStore catalog. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCatalog();
+  }, [fetchCatalog]);
 
   const filteredProducts = useMemo(() => {
-    return SAMPLE_PRODUCTS.filter((product) => {
+    return products.filter((product) => {
       const matchesCategory =
-        selectedCategory === 'All' || product.category === selectedCategory;
+        selectedCategory === 'all' ||
+        product.category.toLowerCase() === selectedCategory.toLowerCase();
+      const query = searchQuery.toLowerCase().trim();
       const matchesSearch =
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchQuery.toLowerCase());
+        !query ||
+        product.name.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query) ||
+        product.category.toLowerCase().includes(query);
       return matchesCategory && matchesSearch;
     });
-  }, [selectedCategory, searchQuery]);
+  }, [products, selectedCategory, searchQuery]);
 
   const addToCart = (product: Product) => {
     setCart((prevCart) => {
@@ -115,7 +100,7 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
     });
   };
 
-  const removeFromCart = (productId: string) => {
+  const removeFromCart = (productId: string | number) => {
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.product.id === productId);
       if (existing && existing.quantity > 1) {
@@ -135,24 +120,32 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
     0,
   );
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) {
       Alert.alert('Empty Cart', 'Please add some products to your cart first!');
       return;
     }
 
-    Alert.alert(
-      'Order Successful! 🎉',
-      `Thank you ${user.name}!\nYour order of ${totalCartItems} item(s) totaling $${totalCartPrice.toFixed(
-        2,
-      )} has been placed.`,
-      [
-        {
-          text: 'Great!',
-          onPress: () => setCart([]),
-        },
-      ],
-    );
+    try {
+      setIsCheckingOut(true);
+      const order = await fakeStoreApi.checkout(cart, user);
+      Alert.alert(
+        'Order Placed! 🎉',
+        `Thank you ${user.name}!\nOrder Reference: ${order.orderId}\nTotal: $${order.totalAmount.toFixed(
+          2,
+        )} (${totalCartItems} item${totalCartItems > 1 ? 's' : ''})`,
+        [
+          {
+            text: 'Done',
+            onPress: () => setCart([]),
+          },
+        ],
+      );
+    } catch {
+      Alert.alert('Checkout Error', 'Unable to process checkout. Please try again.');
+    } finally {
+      setIsCheckingOut(false);
+    }
   };
 
   const handleLogoutPress = () => {
@@ -182,7 +175,9 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
           <Text style={styles.greetingText}>
             Hi, {user.name} {user.isGuest ? '👋' : '✨'}
           </Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
+          <Text style={styles.userEmail}>
+            {user.email} • <Text style={styles.apiTag}>FakeStoreAPI</Text>
+          </Text>
         </View>
         <TouchableOpacity
           style={styles.logoutButton}
@@ -198,7 +193,7 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search products, brands..."
+          placeholder="Search products, clothing, tech..."
           placeholderTextColor="#94a3b8"
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -215,11 +210,12 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={CATEGORIES}
+          data={categories}
           keyExtractor={(item) => item}
           contentContainerStyle={styles.categoryList}
           renderItem={({ item }) => {
-            const isSelected = selectedCategory === item;
+            const isSelected =
+              selectedCategory.toLowerCase() === item.toLowerCase();
             return (
               <TouchableOpacity
                 style={[
@@ -235,7 +231,7 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
                     isSelected && styles.categoryTextActive,
                   ]}
                 >
-                  {item}
+                  {formatCategoryName(item)}
                 </Text>
               </TouchableOpacity>
             );
@@ -243,82 +239,122 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
         />
       </View>
 
-      {/* Product List */}
-      <FlatList
-        data={filteredProducts}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.productList}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📦</Text>
-            <Text style={styles.emptyTitle}>No products found</Text>
-            <Text style={styles.emptySubtitle}>
-              Try searching with different keywords or switch categories.
-            </Text>
-          </View>
-        }
-        renderItem={({ item }) => {
-          const itemInCart = cart.find(
-            (cartItem) => cartItem.product.id === item.id,
-          );
-          const quantity = itemInCart ? itemInCart.quantity : 0;
+      {/* Loading & Error Indicators */}
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#38bdf8" />
+          <Text style={styles.loadingText}>Fetching products from FakeStoreAPI...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyIcon}>⚠️</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => fetchCatalog()}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        /* Product List */
+        <FlatList
+          data={filteredProducts}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.productList}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchCatalog(true)}
+              tintColor="#38bdf8"
+              colors={['#38bdf8']}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>📦</Text>
+              <Text style={styles.emptyTitle}>No products found</Text>
+              <Text style={styles.emptySubtitle}>
+                Try searching with different keywords or switch categories.
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const itemInCart = cart.find(
+              (cartItem) => cartItem.product.id.toString() === item.id.toString(),
+            );
+            const quantity = itemInCart ? itemInCart.quantity : 0;
 
-          return (
-            <View style={styles.productCard}>
-              <View style={styles.productIconBadge}>
-                <Text style={styles.productIcon}>{item.icon}</Text>
-              </View>
-
-              <View style={styles.productDetails}>
-                <View style={styles.productCategoryRow}>
-                  <Text style={styles.productCategory}>{item.category}</Text>
-                  <Text style={styles.productRating}>
-                    ⭐ {item.rating} ({item.reviewsCount})
-                  </Text>
-                </View>
-
-                <Text style={styles.productName}>{item.name}</Text>
-                <Text style={styles.productDesc} numberOfLines={2}>
-                  {item.description}
-                </Text>
-
-                <View style={styles.priceActionRow}>
-                  <Text style={styles.productPrice}>
-                    ${item.price.toFixed(2)}
-                  </Text>
-
-                  {quantity > 0 ? (
-                    <View style={styles.quantityControl}>
-                      <TouchableOpacity
-                        style={styles.quantityBtn}
-                        onPress={() => removeFromCart(item.id)}
-                      >
-                        <Text style={styles.quantityBtnText}>-</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.quantityText}>{quantity}</Text>
-                      <TouchableOpacity
-                        style={styles.quantityBtn}
-                        onPress={() => addToCart(item)}
-                      >
-                        <Text style={styles.quantityBtnText}>+</Text>
-                      </TouchableOpacity>
-                    </View>
+            return (
+              <View style={styles.productCard}>
+                <View style={styles.productImageContainer}>
+                  {item.image ? (
+                    <Image
+                      source={{ uri: item.image }}
+                      style={styles.productImage}
+                      resizeMode="contain"
+                    />
                   ) : (
-                    <TouchableOpacity
-                      style={styles.addButton}
-                      onPress={() => addToCart(item)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.addButtonText}>+ Add to Cart</Text>
-                    </TouchableOpacity>
+                    <Text style={styles.productIcon}>{item.icon || '🛍️'}</Text>
                   )}
                 </View>
+
+                <View style={styles.productDetails}>
+                  <View style={styles.productCategoryRow}>
+                    <Text style={styles.productCategory} numberOfLines={1}>
+                      {formatCategoryName(item.category)}
+                    </Text>
+                    <Text style={styles.productRating}>
+                      ⭐ {item.rating.toFixed(1)} ({item.reviewsCount})
+                    </Text>
+                  </View>
+
+                  <Text style={styles.productName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.productDesc} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+
+                  <View style={styles.priceActionRow}>
+                    <Text style={styles.productPrice}>
+                      ${item.price.toFixed(2)}
+                    </Text>
+
+                    {quantity > 0 ? (
+                      <View style={styles.quantityControl}>
+                        <TouchableOpacity
+                          style={styles.quantityBtn}
+                          onPress={() => removeFromCart(item.id)}
+                        >
+                          <Text style={styles.quantityBtnText}>-</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.quantityText}>{quantity}</Text>
+                        <TouchableOpacity
+                          style={styles.quantityBtn}
+                          onPress={() => addToCart(item)}
+                        >
+                          <Text style={styles.quantityBtnText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.addButton}
+                        onPress={() => addToCart(item)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.addButtonText}>+ Add to Cart</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
               </View>
-            </View>
-          );
-        }}
-      />
+            );
+          }}
+        />
+      )}
 
       {/* Floating Bottom Cart Bar */}
       {totalCartItems > 0 && (
@@ -332,11 +368,16 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
             </Text>
           </View>
           <TouchableOpacity
-            style={styles.checkoutButton}
+            style={[styles.checkoutButton, isCheckingOut && styles.disabledButton]}
             onPress={handleCheckout}
+            disabled={isCheckingOut}
             activeOpacity={0.85}
           >
-            <Text style={styles.checkoutButtonText}>Checkout ➔</Text>
+            {isCheckingOut ? (
+              <ActivityIndicator size="small" color="#1d4ed8" />
+            ) : (
+              <Text style={styles.checkoutButtonText}>Checkout ➔</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -368,6 +409,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94a3b8',
     marginTop: 2,
+  },
+  apiTag: {
+    color: '#38bdf8',
+    fontWeight: '700',
   },
   logoutButton: {
     backgroundColor: '#1e293b',
@@ -447,6 +492,21 @@ const styles = StyleSheet.create({
     borderColor: '#334155',
     alignItems: 'center',
   },
+  productImageContainer: {
+    width: 68,
+    height: 68,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    overflow: 'hidden',
+    padding: 4,
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+  },
   productIconBadge: {
     width: 64,
     height: 64,
@@ -458,6 +518,40 @@ const styles = StyleSheet.create({
   },
   productIcon: {
     fontSize: 32,
+  },
+  centerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    color: '#94a3b8',
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  errorText: {
+    color: '#f87171',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+    paddingHorizontal: 20,
+  },
+  retryButton: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   productDetails: {
     flex: 1,
