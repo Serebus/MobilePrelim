@@ -98,7 +98,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const handleDemoLogin = () => {
     setEmail('shopper@market.com');
     setPassword('shopper123');
-    setName('Alex Johnson');
+    setName('James Maguinda');
     setErrorMessage('');
 
     setIsLoading(true);
@@ -106,7 +106,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       setIsLoading(false);
       onLoginSuccess({
         id: 'usr_demo_123',
-        name: 'Alex Johnson',
+        name: 'James Maguinda',
         email: 'shopper@market.com',
         isGuest: false,
       });
@@ -214,7 +214,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 <Text style={styles.inputPrefixIcon}>👤</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. Alex Johnson"
+                  placeholder="e.g. James Maguinda"
                   placeholderTextColor="#94a3b8"
                   value={name}
                   onChangeText={setName}
