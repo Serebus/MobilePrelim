@@ -244,4 +244,61 @@ describe('Cart Feature & Modals', () => {
 
     expect(onCheckout).toHaveBeenCalled();
   });
+
+  test('floating bottom cart bar is positioned above bottom navigation bar and opens cart', async () => {
+    const onCartChange = jest.fn();
+    let renderer: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <SafeAreaProvider initialMetrics={safeAreaMetrics}>
+          <ShoppingScreen
+            user={mockUser}
+            onLogout={jest.fn()}
+            onCartChange={onCartChange}
+          />
+        </SafeAreaProvider>,
+      );
+    });
+
+    const root = renderer!.root;
+
+    // Add product to cart
+    const addBtn = root.findAllByType(TouchableOpacity).find((t) => {
+      const child = t.props.children;
+      return (
+        typeof child?.props?.children === 'string' &&
+        child.props.children.includes('+ Add to Cart')
+      );
+    });
+
+    await ReactTestRenderer.act(async () => {
+      addBtn!.props.onPress();
+    });
+
+    // onCartChange should have been notified
+    expect(onCartChange).toHaveBeenCalledWith(1);
+
+    // Find the floating bottom cart bar
+    const floatingCartBar = root.findAllByType(TouchableOpacity).find(
+      (t) => t.props.testID === 'floating-cart-bar',
+    );
+
+    expect(floatingCartBar).toBeDefined();
+
+    // Verify bottom positioning style is above navbar (bottom >= 70)
+    const flattenedStyle = Array.isArray(floatingCartBar!.props.style)
+      ? Object.assign({}, ...floatingCartBar!.props.style.filter(Boolean))
+      : floatingCartBar!.props.style;
+    expect(flattenedStyle.bottom).toBeGreaterThanOrEqual(70);
+
+    // Pressing floating cart bar should open CartModal
+    const cartModal = root.findByType(CartModal);
+    expect(cartModal.props.visible).toBe(false);
+
+    await ReactTestRenderer.act(async () => {
+      floatingCartBar!.props.onPress();
+    });
+
+    expect(cartModal.props.visible).toBe(true);
+  });
 });

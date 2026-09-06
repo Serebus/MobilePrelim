@@ -21,6 +21,7 @@ interface ShoppingScreenProps {
   user: User;
   onLogout: () => void;
   onOpenProfile?: () => void;
+  onCartChange?: (count: number) => void;
 }
 
 const formatCategoryName = (category: string): string => {
@@ -35,6 +36,7 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
   user,
   onLogout,
   onOpenProfile,
+  onCartChange,
 }) => {
   const insets = useSafeAreaInsets();
   const [products, setProducts] = useState<Product[]>([]);
@@ -175,6 +177,10 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
     0,
   );
 
+  useEffect(() => {
+    onCartChange?.(totalCartItems);
+  }, [totalCartItems, onCartChange]);
+
   const handleCheckout = async () => {
     if (cart.length === 0) {
       Alert.alert('Empty Cart', 'Please add some products to your cart first!');
@@ -228,7 +234,6 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
         styles.container,
         {
           paddingTop: insets.top + 12,
-          paddingBottom: insets.bottom + (totalCartItems > 0 ? 80 : 16),
         },
       ]}
     >
@@ -363,7 +368,15 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
         <FlatList
           data={filteredProducts}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.productList}
+          contentContainerStyle={[
+            styles.productList,
+            {
+              paddingBottom:
+                totalCartItems > 0
+                  ? Math.max(insets.bottom, 10) + 145
+                  : Math.max(insets.bottom, 10) + 75,
+            },
+          ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -461,9 +474,13 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
       {/* Floating Bottom Cart Bar */}
       {totalCartItems > 0 && (
         <TouchableOpacity
-          style={[styles.cartBar, { bottom: insets.bottom + 10 }]}
+          style={[
+            styles.cartBar,
+            { bottom: Math.max(insets.bottom, 10) + 70 },
+          ]}
           onPress={() => setIsCartVisible(true)}
           activeOpacity={0.9}
+          testID="floating-cart-bar"
         >
           <View style={styles.cartBarLeft}>
             <Text style={styles.cartItemCount}>
@@ -854,6 +871,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
+    zIndex: 50,
     backgroundColor: '#2563eb',
     borderRadius: 16,
     paddingHorizontal: 16,

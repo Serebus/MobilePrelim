@@ -17,6 +17,7 @@ import { User } from './src/types';
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('shop');
+  const [cartCount, setCartCount] = useState<number>(0);
 
   const handleLoginSuccess = (loggedInUser: User) => {
     setUser(loggedInUser);
@@ -26,6 +27,7 @@ function App() {
   const handleLogout = () => {
     setUser(null);
     setActiveTab('shop');
+    setCartCount(0);
   };
 
   const handleUpdateUser = (updatedUser: User) => {
@@ -48,6 +50,7 @@ function App() {
                 user={user}
                 onLogout={handleLogout}
                 onOpenProfile={() => setActiveTab('profile')}
+                onCartChange={setCartCount}
               />
             ) : (
               <ProfileScreen
@@ -57,7 +60,11 @@ function App() {
                 onUpdateUser={handleUpdateUser}
               />
             )}
-            <BottomNavBar activeTab={activeTab} onTabChange={setActiveTab} />
+            <BottomNavBar
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              cartCount={cartCount}
+            />
           </View>
         ) : (
           <LoginScreen onLoginSuccess={handleLoginSuccess} />
