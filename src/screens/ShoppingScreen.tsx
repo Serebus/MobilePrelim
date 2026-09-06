@@ -14,6 +14,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CartItem, Product, User } from '../types';
 import { fakeStoreApi } from '../api/fakeStoreApi';
+import { CartModal } from '../components/CartModal';
+import { ProductDetailModal } from '../components/ProductDetailModal';
 
 interface ShoppingScreenProps {
   user: User;
@@ -42,6 +44,9 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [isCheckingOut, setIsCheckingOut] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCartVisible, setIsCartVisible] = useState<boolean>(false);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchCatalog = useCallback(async (isRefresh = false) => {
     try {
@@ -71,6 +76,13 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
     fetchCatalog();
   }, [fetchCatalog]);
 
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 2200);
+  };
+
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const matchesCategory =
@@ -86,32 +98,73 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
     });
   }, [products, selectedCategory, searchQuery]);
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, quantityToAdd: number = 1) => {
     setCart((prevCart) => {
-      const existing = prevCart.find((item) => item.product.id === product.id);
+      const existing = prevCart.find(
+        (item) => item.product.id.toString() === product.id.toString(),
+      );
       if (existing) {
         return prevCart.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+          item.product.id.toString() === product.id.toString()
+            ? { ...item, quantity: item.quantity + quantityToAdd }
             : item,
         );
       }
-      return [...prevCart, { product, quantity: 1 }];
+      return [...prevCart, { product, quantity: quantityToAdd }];
+    });
+
+    const title = product.name || product.title || 'Item';
+    const shortTitle = title.length > 20 ? title.substring(0, 20) + '...' : title;
+    showToast(`Added ${quantityToAdd > 1 ? `${quantityToAdd}x ` : ''}"${shortTitle}" to cart! 🛒`);
+  };
+
+  const updateQuantity = (productId: string | number, delta: number) => {
+    setCart((prevCart) => {
+      const existing = prevCart.find(
+        (item) => item.product.id.toString() === productId.toString(),
+      );
+      if (!existing) return prevCart;
+
+      const newQty = existing.quantity + delta;
+      if (newQty <= 0) {
+        return prevCart.filter(
+          (item) => item.product.id.toString() !== productId.toString(),
+        );
+      }
+
+      return prevCart.map((item) =>
+        item.product.id.toString() === productId.toString()
+          ? { ...item, quantity: newQty }
+          : item,
+      );
     });
   };
 
   const removeFromCart = (productId: string | number) => {
-    setCart((prevCart) => {
-      const existing = prevCart.find((item) => item.product.id === productId);
-      if (existing && existing.quantity > 1) {
-        return prevCart.map((item) =>
-          item.product.id === productId
-            ? { ...item, quantity: item.quantity - 1 }
-            : item,
-        );
-      }
-      return prevCart.filter((item) => item.product.id !== productId);
-    });
+    updateQuantity(productId, -1);
+  };
+
+  const removeItemCompletely = (productId: string | number) => {
+    setCart((prevCart) =>
+      prevCart.filter(
+        (item) => item.product.id.toString() !== productId.toString(),
+      ),
+    );
+  };
+
+  const clearCart = () => {
+    Alert.alert(
+      'Clear Cart',
+      'Are you sure you want to remove all items from your cart?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: () => setCart([]),
+        },
+      ],
+    );
   };
 
   const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -129,6 +182,7 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
     try {
       setIsCheckingOut(true);
       const order = await fakeStoreApi.checkout(cart, user);
+      setIsCartVisible(false);
       Alert.alert(
         'Order Placed! 🎉',
         `Thank you ${user.name}!\nOrder Reference: ${order.orderId}\nTotal: $${order.totalAmount.toFixed(
@@ -159,6 +213,13 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
     );
   };
 
+  const getProductCartQuantity = (productId: string | number) => {
+    const item = cart.find(
+      (cartItem) => cartItem.product.id.toString() === productId.toString(),
+    );
+    return item ? item.quantity : 0;
+  };
+
   return (
     <View
       style={[
@@ -169,6 +230,13 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
         },
       ]}
     >
+      {/* Toast Banner */}
+      {toastMessage && (
+        <View style={[styles.toastBanner, { top: insets.top + 55 }]}>
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      )}
+
       {/* Top Bar */}
       <View style={styles.topBar}>
         <View style={styles.userInfo}>
@@ -179,13 +247,32 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
             {user.email} • <Text style={styles.apiTag}>FakeStoreAPI</Text>
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogoutPress}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.logoutButtonText}>Sign Out 🚪</Text>
-        </TouchableOpacity>
+
+        <View style={styles.topBarActions}>
+          {/* Cart Header Button with Badge */}
+          <TouchableOpacity
+            style={styles.headerCartButton}
+            onPress={() => setIsCartVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.headerCartIcon}>🛒</Text>
+            {totalCartItems > 0 && (
+              <View style={styles.headerCartBadge}>
+                <Text style={styles.headerCartBadgeText}>
+                  {totalCartItems > 99 ? '99+' : totalCartItems}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogoutPress}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.logoutButtonText}>Sign Out 🚪</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search Input */}
@@ -282,13 +369,14 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
             </View>
           }
           renderItem={({ item }) => {
-            const itemInCart = cart.find(
-              (cartItem) => cartItem.product.id.toString() === item.id.toString(),
-            );
-            const quantity = itemInCart ? itemInCart.quantity : 0;
+            const quantity = getProductCartQuantity(item.id);
 
             return (
-              <View style={styles.productCard}>
+              <TouchableOpacity
+                style={styles.productCard}
+                onPress={() => setDetailProduct(item)}
+                activeOpacity={0.9}
+              >
                 <View style={styles.productImageContainer}>
                   {item.image ? (
                     <Image
@@ -350,7 +438,7 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
                     )}
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           }}
         />
@@ -358,10 +446,14 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
 
       {/* Floating Bottom Cart Bar */}
       {totalCartItems > 0 && (
-        <View style={[styles.cartBar, { bottom: insets.bottom + 10 }]}>
+        <TouchableOpacity
+          style={[styles.cartBar, { bottom: insets.bottom + 10 }]}
+          onPress={() => setIsCartVisible(true)}
+          activeOpacity={0.9}
+        >
           <View style={styles.cartBarLeft}>
             <Text style={styles.cartItemCount}>
-              🛒 {totalCartItems} {totalCartItems === 1 ? 'item' : 'items'}
+              🛒 {totalCartItems} {totalCartItems === 1 ? 'item' : 'items'} • View Cart
             </Text>
             <Text style={styles.cartTotalAmount}>
               ${totalCartPrice.toFixed(2)}
@@ -379,8 +471,30 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
               <Text style={styles.checkoutButtonText}>Checkout ➔</Text>
             )}
           </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
       )}
+
+      {/* Cart Modal */}
+      <CartModal
+        visible={isCartVisible}
+        onClose={() => setIsCartVisible(false)}
+        cart={cart}
+        onUpdateQuantity={updateQuantity}
+        onRemoveItem={removeItemCompletely}
+        onClearCart={clearCart}
+        onCheckout={handleCheckout}
+        isCheckingOut={isCheckingOut}
+        user={user}
+      />
+
+      {/* Product Details Modal */}
+      <ProductDetailModal
+        visible={!!detailProduct}
+        product={detailProduct}
+        onClose={() => setDetailProduct(null)}
+        onAddToCart={addToCart}
+        currentCartQuantity={detailProduct ? getProductCartQuantity(detailProduct.id) : 0}
+      />
     </View>
   );
 };
@@ -390,6 +504,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f172a',
     paddingHorizontal: 16,
+  },
+  toastBanner: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    zIndex: 999,
+    backgroundColor: '#1e293b',
+    borderColor: '#38bdf8',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  toastText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   topBar: {
     flexDirection: 'row',
@@ -414,13 +551,49 @@ const styles = StyleSheet.create({
     color: '#38bdf8',
     fontWeight: '700',
   },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerCartButton: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+    borderWidth: 1,
+    borderRadius: 10,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  headerCartIcon: {
+    fontSize: 18,
+  },
+  headerCartBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  headerCartBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
   logoutButton: {
     backgroundColor: '#1e293b',
     borderColor: '#334155',
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   logoutButtonText: {
     color: '#cbd5e1',
