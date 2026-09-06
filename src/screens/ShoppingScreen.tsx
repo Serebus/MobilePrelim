@@ -20,6 +20,7 @@ import { ProductDetailModal } from '../components/ProductDetailModal';
 interface ShoppingScreenProps {
   user: User;
   onLogout: () => void;
+  onOpenProfile?: () => void;
 }
 
 const formatCategoryName = (category: string): string => {
@@ -33,6 +34,7 @@ const formatCategoryName = (category: string): string => {
 export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
   user,
   onLogout,
+  onOpenProfile,
 }) => {
   const insets = useSafeAreaInsets();
   const [products, setProducts] = useState<Product[]>([]);
@@ -249,6 +251,18 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({
         </View>
 
         <View style={styles.topBarActions}>
+          {/* Profile Header Button */}
+          {onOpenProfile && (
+            <TouchableOpacity
+              style={styles.headerProfileButton}
+              onPress={onOpenProfile}
+              activeOpacity={0.8}
+              testID="header-profile-button"
+            >
+              <Text style={styles.headerProfileIcon}>👤</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Cart Header Button with Badge */}
           <TouchableOpacity
             style={styles.headerCartButton}
@@ -555,6 +569,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  headerProfileButton: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+    borderWidth: 1,
+    borderRadius: 10,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerProfileIcon: {
+    fontSize: 18,
   },
   headerCartButton: {
     backgroundColor: '#1e293b',

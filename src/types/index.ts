@@ -3,6 +3,13 @@ export interface User {
   name: string;
   email: string;
   isGuest?: boolean;
+  phone?: string;
+  address?: string;
+  city?: string;
+  zipCode?: string;
+  memberSince?: string;
+  ordersCount?: number;
+  rewardPoints?: number;
 }
 
 export interface FakeStoreProduct {

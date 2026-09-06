@@ -10,17 +10,26 @@ import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { ShoppingScreen } from './src/screens/ShoppingScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
+import { BottomNavBar, AppTab } from './src/components/BottomNavBar';
 import { User } from './src/types';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState<AppTab>('shop');
 
   const handleLoginSuccess = (loggedInUser: User) => {
     setUser(loggedInUser);
+    setActiveTab('shop');
   };
 
   const handleLogout = () => {
     setUser(null);
+    setActiveTab('shop');
+  };
+
+  const handleUpdateUser = (updatedUser: User) => {
+    setUser(updatedUser);
   };
 
   return (
@@ -33,7 +42,23 @@ function App() {
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
       <View style={styles.container}>
         {user ? (
-          <ShoppingScreen user={user} onLogout={handleLogout} />
+          <View style={styles.container}>
+            {activeTab === 'shop' ? (
+              <ShoppingScreen
+                user={user}
+                onLogout={handleLogout}
+                onOpenProfile={() => setActiveTab('profile')}
+              />
+            ) : (
+              <ProfileScreen
+                user={user}
+                onLogout={handleLogout}
+                onNavigateToShop={() => setActiveTab('shop')}
+                onUpdateUser={handleUpdateUser}
+              />
+            )}
+            <BottomNavBar activeTab={activeTab} onTabChange={setActiveTab} />
+          </View>
         ) : (
           <LoginScreen onLoginSuccess={handleLoginSuccess} />
         )}

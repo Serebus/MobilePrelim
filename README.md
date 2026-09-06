@@ -1,97 +1,161 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# MobilePrelim — Multi-Screen Mobile E-Commerce App
 
-# Getting Started
+A cross-platform React Native mobile application built from scratch featuring multi-screen navigation, reusable custom UI components, interactive e-commerce catalog and cart management, user profile settings, and third-party library integration.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+---
 
-## Step 1: Start Metro
+## 📋 Student & Project Information
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+| Field | Details |
+|---|---|
+| **Project Title** | Static Multi-Screen Mobile App with Navigation & Third-Party Integration |
+| **Student Name** | *[Insert Student Name]* |
+| **Section / Course** | *[Insert Course / Section, e.g., CS-301 / Section A]* |
+| **Framework** | React Native (v0.86+) / TypeScript |
+| **API / Data Source** | FakeStoreAPI with offline local mock fallbacks |
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+---
 
+## 📱 Primary Screens
+
+The application includes **three primary screens**, each serving a distinct role:
+
+### 1. `LoginScreen` (`src/screens/LoginScreen.tsx`)
+- **Role**: User authentication and guest onboarding.
+- **Features**:
+  - Email & password form with real-time validation and error feedback.
+  - Password visibility toggle.
+  - One-click **"Continue as Guest"** option for instant access.
+  - Auto-fills predefined demo credentials for quick testing.
+
+### 2. `ShoppingScreen` (`src/screens/ShoppingScreen.tsx`)
+- **Role**: Product discovery, catalog browsing, and cart operations.
+- **Features**:
+  - Live search filter by product title and description.
+  - Interactive category filter chips (All, Electronics, Jewelery, Men's Clothing, Women's Clothing).
+  - Product grid with rating stars, price tags, and quick "Add to Cart" action.
+  - **Product Detail Modal** for deep-dive specifications and quantity selection.
+  - **Cart Drawer Modal** with line-item management (+ / - / delete), subtotal and shipping calculation, and checkout.
+  - Animated toast notifications on cart additions.
+  - Top-bar shortcut to Profile and live cart badge.
+
+### 3. `ProfileScreen` (`src/screens/ProfileScreen.tsx`)
+- **Role**: Account management, personal stats, order history, and preferences.
+- **Features**:
+  - User avatar with initials and dynamic membership badge (Gold / Guest).
+  - Quick statistics counters: Total Orders, Rewards Points, Wishlist items, and Coupons.
+  - Personal information cards (Email, Phone, Shipping Address).
+  - Interactive Order History with viewable order receipt details.
+  - Interactive preference switches: *Push Notifications*, *SMS Alerts*, *Dark Theme*, and *Biometric Login*.
+  - **Edit Profile Modal** allowing updates to name, phone, address, city, and zip code with live app state sync.
+  - Sign-out confirmation dialog returning safely to the login screen.
+
+---
+
+## 🧩 Reusable Custom Components
+
+The project includes modular, reusable custom UI components located in `src/components/`:
+
+1. **`CustomButton` (`src/components/CustomButton.tsx`)**:
+   - Universal, accessible button component with multiple styling variants (`primary`, `secondary`, `outline`, `danger`, `ghost`) and sizes (`small`, `medium`, `large`).
+   - Supports loading indicators, emoji icons, disabled states, and custom styles. Reused throughout the app.
+2. **`BottomNavBar` (`src/components/BottomNavBar.tsx`)**:
+   - Reusable bottom navigation tab bar managing transitions between `'shop'` and `'profile'` tabs.
+   - Includes real-time cart item count badge and safe area bottom inset padding.
+3. **`CartModal` (`src/components/CartModal.tsx`)**:
+   - Reusable slide-up modal drawer for viewing cart contents, modifying item quantities, reviewing order breakdowns, and completing checkout.
+4. **`ProductDetailModal` (`src/components/ProductDetailModal.tsx`)**:
+   - Reusable modal dialog for inspecting product images, full descriptions, category tags, ratings, and quantity selectors.
+
+---
+
+## 📦 Third-Party Packages Used
+
+| Package | Version | Purpose & Integration |
+|---|---|---|
+| **`react-native-safe-area-context`** | `^5.5.2` | Actively integrated via `SafeAreaProvider` at the app root and `useSafeAreaInsets` across all 3 screens (`LoginScreen`, `ShoppingScreen`, `ProfileScreen`) and `BottomNavBar` to handle device notches, dynamic islands, and bottom system navigation bars. |
+
+---
+
+## 🗺️ Navigation Flow
+
+```
+[ Launch App ]
+       │
+       ▼
+ [ LoginScreen ] ─── (Sign In / Guest) ───┐
+       ▲                                  │
+       │ (Sign Out)                       ▼
+       └───────────────────────── [ Main App View ]
+                                     ├── Tab 1: [ ShoppingScreen ]
+                                     │     ├── [ ProductDetailModal ]
+                                     │     └── [ CartModal ]
+                                     │
+                                     └── Tab 2: [ ProfileScreen ]
+                                           ├── [ Edit Profile Modal ]
+                                           └── [ Order Details Dialog ]
+```
+
+- **Authentication Flow**: State-based auth guard in `App.tsx`. Logging out resets user state and returns to `LoginScreen`.
+- **Tab Navigation**: Seamless switching between the Shop and Profile views via `BottomNavBar` or the header profile button.
+
+---
+
+## 🚀 How to Run the Project
+
+### Prerequisites
+- [Node.js](https://nodejs.org/) (version >= 22.11.0 recommended)
+- `npm` or `yarn`
+- Android Studio (for Android Emulator) or Xcode (for iOS Simulator)
+
+### 1. Install Dependencies
 ```sh
-# Using npm
+npm install
+```
+
+### 2. Start Metro Dev Server
+```sh
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
+### 3. Run on Android or iOS
+In a separate terminal window:
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+- **Android**:
+  ```sh
+  npm run android
+  ```
+- **iOS** (macOS only):
+  ```sh
+  bundle exec pod install   # only on initial setup
+  npm run ios
+  ```
 
-### Android
+---
 
+## 🧪 Automated Testing & Code Quality
+
+The project includes a comprehensive Jest test suite covering all screens, navigation, and user interactions.
+
+### Run Unit & Integration Tests:
 ```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+npm test
 ```
+*Current test suite: **3 test suites, 16 tests passing 100%**.*
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
+### Run Linter & Type Checks:
 ```sh
-bundle install
+npm run lint
+npx tsc --noEmit
 ```
 
-Then, and every time you update your native dependencies, run:
+---
 
-```sh
-bundle exec pod install
-```
+## 🎥 Demonstration Video Guide (1–2 minutes)
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+When recording your demo video, follow this recommended walkthrough:
+1. **Login**: Show the login screen, enter credentials (or click guest), and sign in.
+2. **Shopping Screen**: Search for a product, switch categories, open a product detail modal, and add items to the cart.
+3. **Cart Drawer**: Open the cart modal, adjust quantities (+/-), verify total calculation, and proceed to checkout.
+4. **Profile Screen**: Tap the bottom tab to navigate to the Profile screen, toggle settings switches, open the "Edit Profile" modal, update profile details, and save.
+5. **Sign Out**: Click Sign Out to verify navigation back to the Login screen.
